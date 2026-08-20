@@ -39,7 +39,7 @@ the next.
   decodes with the same schema, and prints each order.
   Commit: `Implement consumer with Avro decoding`
 
-- [ ] **5. Real-time running average** — consumer recalculates and prints the
+- [x] **5. Real-time running average** — consumer recalculates and prints the
   running average price after every successfully processed order.
   Commit: `Add running average calculation to consumer`
 

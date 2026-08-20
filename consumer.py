@@ -22,6 +22,9 @@ def main():
     })
     consumer.subscribe([TOPIC])
 
+    total_price = 0.0
+    count = 0
+
     try:
         while True:
             msg = consumer.poll(1.0)
@@ -32,9 +35,12 @@ def main():
                 continue
 
             order = schemaless_reader(io.BytesIO(msg.value()), schema)
+            count += 1
+            total_price += order["price"]
+            running_avg = total_price / count
             print(
                 f"received orderId={order['orderId']} product={order['product']} "
-                f"price={order['price']:.2f} "
+                f"price={order['price']:.2f} | running avg={running_avg:.2f} (n={count}) "
                 f"[partition {msg.partition()}, offset {msg.offset()}]",
                 flush=True,
             )

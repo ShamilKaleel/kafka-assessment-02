@@ -35,7 +35,7 @@ the next.
   and sends them Avro-encoded to the `orders` topic.
   Commit: `Implement producer with Avro encoding`
 
-- [ ] **4. Minimal consumer** — Python script that reads from `orders`,
+- [x] **4. Minimal consumer** — Python script that reads from `orders`,
   decodes with the same schema, and prints each order.
   Commit: `Implement consumer with Avro decoding`
 

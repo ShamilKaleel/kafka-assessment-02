@@ -36,7 +36,8 @@ def delivery_report(err, msg):
     else:
         print(
             f"sent orderId={msg.key().decode()} -> "
-            f"{msg.topic()} [partition {msg.partition()}, offset {msg.offset()}]"
+            f"{msg.topic()} [partition {msg.partition()}, offset {msg.offset()}]",
+            flush=True,
         )
 
 

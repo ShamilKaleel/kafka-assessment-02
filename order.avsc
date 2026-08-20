@@ -1,0 +1,9 @@
+{
+  "type": "record",
+  "name": "Order",
+  "fields": [
+    { "name": "orderId", "type": "string" },
+    { "name": "product", "type": "string" },
+    { "name": "price", "type": "float" }
+  ]
+}

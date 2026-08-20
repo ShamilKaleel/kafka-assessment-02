@@ -26,7 +26,7 @@ the next.
   `docker compose up` brings up a working broker for dev and the live demo.
   Commit: `Add docker-compose setup for local Kafka`
 
-- [ ] **2. Avro schema** — add `order.avsc` defining the order message
+- [x] **2. Avro schema** — add `order.avsc` defining the order message
   (`orderId`: string, `product`: string, `price`: float), matching the
   assignment's schema table.
   Commit: `Add order.avsc Avro schema`

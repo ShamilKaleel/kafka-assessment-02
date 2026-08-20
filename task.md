@@ -43,7 +43,7 @@ the next.
   running average price after every successfully processed order.
   Commit: `Add running average calculation to consumer`
 
-- [ ] **6. Retry logic** — wrap message processing so temporary failures are
+- [x] **6. Retry logic** — wrap message processing so temporary failures are
   retried a bounded number of times before being treated as permanent.
   Commit: `Add retry logic for temporary processing failures`
 

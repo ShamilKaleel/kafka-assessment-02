@@ -31,7 +31,7 @@ the next.
   assignment's schema table.
   Commit: `Add order.avsc Avro schema`
 
-- [ ] **3. Minimal producer** — Python script that generates random orders
+- [x] **3. Minimal producer** — Python script that generates random orders
   and sends them Avro-encoded to the `orders` topic.
   Commit: `Implement producer with Avro encoding`
 

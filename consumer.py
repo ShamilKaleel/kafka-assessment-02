@@ -6,12 +6,13 @@ import io
 import random
 import time
 
-from confluent_kafka import Consumer
+from confluent_kafka import Consumer, Producer
 from fastavro import schemaless_reader
 from fastavro.schema import load_schema
 
 BOOTSTRAP_SERVERS = "localhost:9092"
 TOPIC = "orders"
+DLQ_TOPIC = "orders-dlq"
 SCHEMA_PATH = "order.avsc"
 GROUP_ID = "order-consumer-group"
 
@@ -40,6 +41,17 @@ def process_with_retry(order, fail_rate, max_retries, retry_delay):
                 raise
 
 
+def dlq_delivery_report(err, msg):
+    if err is not None:
+        print(f"DLQ delivery failed: {err}")
+    else:
+        print(
+            f"routed to DLQ orderId={msg.key().decode()} -> "
+            f"{msg.topic()} [partition {msg.partition()}, offset {msg.offset()}]",
+            flush=True,
+        )
+
+
 def main():
     parser = argparse.ArgumentParser(description="Order consumer with retry logic")
     parser.add_argument("--fail-rate", type=float, default=0.0, help="probability [0-1] a processing attempt simulates a failure (default: 0.0, off)")
@@ -54,12 +66,14 @@ def main():
         "auto.offset.reset": "earliest",
     })
     consumer.subscribe([TOPIC])
+    dlq_producer = Producer({"bootstrap.servers": BOOTSTRAP_SERVERS})
 
     total_price = 0.0
     count = 0
 
     try:
         while True:
+            dlq_producer.poll(0)
             msg = consumer.poll(1.0)
             if msg is None:
                 continue
@@ -71,11 +85,20 @@ def main():
 
             try:
                 process_with_retry(order, args.fail_rate, args.max_retries, args.retry_delay)
-            except ProcessingError:
-                print(
-                    f"orderId={order['orderId']} permanently failed after {args.max_retries} attempts",
-                    flush=True,
+            except ProcessingError as e:
+                dlq_producer.produce(
+                    DLQ_TOPIC,
+                    key=order["orderId"].encode(),
+                    value=msg.value(),
+                    headers={
+                        "error": str(e).encode(),
+                        "original-topic": msg.topic().encode(),
+                        "original-partition": str(msg.partition()).encode(),
+                        "original-offset": str(msg.offset()).encode(),
+                    },
+                    callback=dlq_delivery_report,
                 )
+                dlq_producer.poll(0)
                 continue
 
             count += 1
@@ -91,6 +114,7 @@ def main():
         print("\nstopping...")
     finally:
         consumer.close()
+        dlq_producer.flush()
 
 
 if __name__ == "__main__":

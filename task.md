@@ -47,7 +47,7 @@ the next.
   retried a bounded number of times before being treated as permanent.
   Commit: `Add retry logic for temporary processing failures`
 
-- [ ] **7. Dead Letter Queue (DLQ)** — add an `orders-dlq` topic and route
+- [x] **7. Dead Letter Queue (DLQ)** — add an `orders-dlq` topic and route
   permanently-failed messages to it once retries are exhausted.
   Commit: `Add DLQ routing for permanently failed messages`
 

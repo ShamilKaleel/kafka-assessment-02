@@ -51,7 +51,7 @@ the next.
   permanently-failed messages to it once retries are exhausted.
   Commit: `Add DLQ routing for permanently failed messages`
 
-- [ ] **8. README** — how to start Kafka, run the producer/consumer, and a
+- [x] **8. README** — how to start Kafka, run the producer/consumer, and a
   script for demoing the retry → DLQ path live.
   Commit: `Add README with run and demo instructions`
 

@@ -21,7 +21,7 @@ the next.
   and the 4 Kafka diagrams in `diagrams/`.
   Commit: `Add step-by-step assignment explainer with Kafka diagrams`
 
-- [ ] **1. Local Kafka via Docker Compose** — add `docker-compose.yml`
+- [x] **1. Local Kafka via Docker Compose** — add `docker-compose.yml`
   (single-broker Kafka in KRaft mode, no separate Zookeeper) so
   `docker compose up` brings up a working broker for dev and the live demo.
   Commit: `Add docker-compose setup for local Kafka`

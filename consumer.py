@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
-"""Consumer: reads orders from Kafka and Avro-decodes them."""
+"""Consumer: reads Avro-encoded orders from Kafka, keeps a running average
+of prices, retries temporary failures, and routes permanent failures to a
+Dead Letter Queue."""
 
 import argparse
 import io
+import os
 import random
 import time
 
@@ -13,50 +16,70 @@ from fastavro.schema import load_schema
 BOOTSTRAP_SERVERS = "localhost:9092"
 TOPIC = "orders"
 DLQ_TOPIC = "orders-dlq"
-SCHEMA_PATH = "order.avsc"
+SCHEMA_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "order.avsc")
 GROUP_ID = "order-consumer-group"
 
 
 class ProcessingError(Exception):
-    """Raised by the simulated failure injector below."""
+    pass
 
 
-def process_with_retry(order, fail_rate, max_retries, retry_delay):
-    """Simulate processing that may temporarily fail, retrying up to max_retries times.
+def process_order(order, fail_rate):
+    """The unit of work for one order.
 
-    fail_rate is a demo knob (default 0.0, i.e. off) since nothing in this
-    toy pipeline can genuinely fail on its own. Raises ProcessingError if
-    still failing after the last attempt.
+    Nothing in this pipeline can fail on its own, so fail_rate (default 0.0)
+    injects a transient failure with that probability to exercise the retry
+    and DLQ paths.
     """
-    for attempt in range(1, max_retries + 1):
+    if fail_rate and random.random() < fail_rate:
+        raise ProcessingError(f"simulated transient failure for orderId={order['orderId']}")
+
+
+def process_with_retry(order, fail_rate, max_attempts, retry_delay):
+    for attempt in range(1, max_attempts + 1):
         try:
-            if fail_rate and random.random() < fail_rate:
-                raise ProcessingError(f"simulated transient failure (attempt {attempt}/{max_retries})")
+            process_order(order, fail_rate)
             return
         except ProcessingError as e:
-            print(f"processing failed: {e}", flush=True)
-            if attempt < max_retries:
+            print(f"processing failed (attempt {attempt}/{max_attempts}): {e}", flush=True)
+            if attempt < max_attempts:
                 time.sleep(retry_delay)
             else:
-                raise
+                raise ProcessingError(f"failed after {max_attempts} attempts: {e}") from None
 
 
 def dlq_delivery_report(err, msg):
+    key = msg.key().decode() if msg.key() else "<none>"
     if err is not None:
-        print(f"DLQ delivery failed: {err}")
+        print(f"DLQ delivery failed for key={key}: {err}", flush=True)
     else:
         print(
-            f"routed to DLQ orderId={msg.key().decode()} -> "
+            f"routed to DLQ key={key} -> "
             f"{msg.topic()} [partition {msg.partition()}, offset {msg.offset()}]",
             flush=True,
         )
 
 
+def send_to_dlq(dlq_producer, msg, reason):
+    dlq_producer.produce(
+        DLQ_TOPIC,
+        key=msg.key(),
+        value=msg.value(),
+        headers={
+            "error": reason.encode(),
+            "original-topic": msg.topic().encode(),
+            "original-partition": str(msg.partition()).encode(),
+            "original-offset": str(msg.offset()).encode(),
+        },
+        callback=dlq_delivery_report,
+    )
+
+
 def main():
-    parser = argparse.ArgumentParser(description="Order consumer with retry logic")
+    parser = argparse.ArgumentParser(description="Order consumer: running average, retry logic, DLQ")
     parser.add_argument("--fail-rate", type=float, default=0.0, help="probability [0-1] a processing attempt simulates a failure (default: 0.0, off)")
-    parser.add_argument("--max-retries", type=int, default=3, help="max processing attempts before treating a message as permanently failed (default: 3)")
-    parser.add_argument("--retry-delay", type=float, default=1.0, help="seconds to wait between retries (default: 1.0)")
+    parser.add_argument("--max-attempts", type=int, default=3, help="processing attempts before a message is treated as permanently failed (default: 3)")
+    parser.add_argument("--retry-delay", type=float, default=1.0, help="seconds to wait between attempts (default: 1.0)")
     args = parser.parse_args()
 
     schema = load_schema(SCHEMA_PATH)
@@ -78,27 +101,20 @@ def main():
             if msg is None:
                 continue
             if msg.error():
-                print(f"consumer error: {msg.error()}")
+                print(f"consumer error: {msg.error()}", flush=True)
                 continue
 
-            order = schemaless_reader(io.BytesIO(msg.value()), schema)
+            try:
+                order = schemaless_reader(io.BytesIO(msg.value()), schema)
+            except Exception as e:
+                # Undecodable bytes are permanently failed: no retry can fix them.
+                send_to_dlq(dlq_producer, msg, f"decode error: {e}")
+                continue
 
             try:
-                process_with_retry(order, args.fail_rate, args.max_retries, args.retry_delay)
+                process_with_retry(order, args.fail_rate, args.max_attempts, args.retry_delay)
             except ProcessingError as e:
-                dlq_producer.produce(
-                    DLQ_TOPIC,
-                    key=order["orderId"].encode(),
-                    value=msg.value(),
-                    headers={
-                        "error": str(e).encode(),
-                        "original-topic": msg.topic().encode(),
-                        "original-partition": str(msg.partition()).encode(),
-                        "original-offset": str(msg.offset()).encode(),
-                    },
-                    callback=dlq_delivery_report,
-                )
-                dlq_producer.poll(0)
+                send_to_dlq(dlq_producer, msg, str(e))
                 continue
 
             count += 1
@@ -111,7 +127,7 @@ def main():
                 flush=True,
             )
     except KeyboardInterrupt:
-        print("\nstopping...")
+        print("\nstopping...", flush=True)
     finally:
         consumer.close()
         dlq_producer.flush()

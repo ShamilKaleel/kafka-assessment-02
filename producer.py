@@ -3,6 +3,7 @@
 
 import argparse
 import io
+import os
 import random
 import time
 
@@ -12,7 +13,7 @@ from fastavro.schema import load_schema
 
 BOOTSTRAP_SERVERS = "localhost:9092"
 TOPIC = "orders"
-SCHEMA_PATH = "order.avsc"
+SCHEMA_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "order.avsc")
 PRODUCTS = ["Item1", "Item2", "Item3", "Item4", "Item5"]
 
 
@@ -32,7 +33,7 @@ def encode(schema, order):
 
 def delivery_report(err, msg):
     if err is not None:
-        print(f"delivery failed: {err}")
+        print(f"delivery failed: {err}", flush=True)
     else:
         print(
             f"sent orderId={msg.key().decode()} -> "
@@ -66,7 +67,7 @@ def main():
             sent += 1
             time.sleep(args.interval)
     except KeyboardInterrupt:
-        print("\nstopping...")
+        print("\nstopping...", flush=True)
     finally:
         producer.flush()
 

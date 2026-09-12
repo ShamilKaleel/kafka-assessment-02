@@ -55,12 +55,14 @@ Retry/DLQ flags (all optional):
 | Flag             | Default | Meaning                                                       |
 |------------------|---------|----------------------------------------------------------------|
 | `--fail-rate`    | `0.0`   | Probability [0-1] a processing attempt simulates a failure. Demo-only knob — nothing in this pipeline fails on its own, so this is how you make the retry/DLQ path actually trigger. |
-| `--max-retries`  | `3`     | Attempts before a message is treated as permanently failed.   |
-| `--retry-delay`  | `1.0`   | Seconds to wait between retries.                               |
+| `--max-attempts` | `3`     | Processing attempts before a message is treated as permanently failed. |
+| `--retry-delay`  | `1.0`   | Seconds to wait between attempts.                              |
 
 Permanently failed messages are routed to the `orders-dlq` topic, keyed by
 `orderId`, carrying the original Avro bytes plus headers (`error`,
-`original-topic`, `original-partition`, `original-offset`).
+`original-topic`, `original-partition`, `original-offset`). This covers both
+orders that still fail after the last attempt and messages that can't be
+Avro-decoded at all (those skip the retries — no retry can fix bad bytes).
 
 Stop either script with `Ctrl+C` — both shut down cleanly.
 
@@ -76,14 +78,19 @@ Stop either script with `Ctrl+C` — both shut down cleanly.
    ```
    Watch orders flow through and the running average update live in
    Terminal 1.
+
+   On a brand-new cluster the consumer prints one
+   `consumer error: ... UNKNOWN_TOPIC_OR_PART` line while it waits for the
+   producer to create the `orders` topic — expected; it picks the topic up
+   by itself within a few seconds.
 3. Stop the consumer (`Ctrl+C`), then restart it with simulated failures on
    to show the retry → DLQ path:
    ```bash
-   .venv/bin/python3 consumer.py --fail-rate 1.0 --max-retries 3 --retry-delay 1
+   .venv/bin/python3 consumer.py --fail-rate 1.0 --max-attempts 3 --retry-delay 1
    ```
    With the producer still running (or send a couple more with
-   `--count 3`), you'll see `processing failed: ...` lines repeat up to
-   `--max-retries` times, then `routed to DLQ orderId=... -> orders-dlq
+   `--count 3`), you'll see `processing failed (attempt N/3): ...` lines
+   up to `--max-attempts` times, then `routed to DLQ key=... -> orders-dlq
    [...]` — that confirmation line is the DLQ evidence, no separate
    inspection tool needed.
 
@@ -108,6 +115,7 @@ docker compose down -v    # also wipe topic data for a totally fresh start
 ## Project structure
 
 ```
+Assignement Chapter 3.pdf  original assignment brief
 Assignment.md              raw extracted assignment text
 Assignment-Explained.md    step-by-step explanation with diagrams
 task.md                    task checklist and commit workflow

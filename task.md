@@ -55,7 +55,7 @@ the next.
   script for demoing the retry → DLQ path live.
   Commit: `Add README with run and demo instructions`
 
-- [ ] **9. Final review** — read through everything once more and rehearse
+- [x] **9. Final review** — read through everything once more and rehearse
   the live demo end-to-end.
   Commit: `Final cleanup before submission`
 

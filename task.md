@@ -59,6 +59,16 @@ the next.
   the live demo end-to-end.
   Commit: `Final cleanup before submission`
 
+- [x] **10. Demo video prep** — `DEMO.md` (timed script for the max-5-minute
+  video), `dlq_reader.py` (show DLQ contents on camera), and push everything
+  to GitHub.
+  Commit: `Add demo video script and DLQ reader`
+
+- [ ] **11. Submit** — give the marker access to the GitHub repo (it's
+  currently private), record the demo video (max 5 min) following `DEMO.md`,
+  and submit the repo link + video.
+  (No commit — done outside the repo.)
+
 ## Stack
 
 - **Language:** Python

@@ -66,7 +66,17 @@ Avro-decoded at all (those skip the retries — no retry can fix bad bytes).
 
 Stop either script with `Ctrl+C` — both shut down cleanly.
 
+**Inspect the DLQ** — prints every message in `orders-dlq` with the reason
+it failed and where it came from:
+
+```bash
+.venv/bin/python3 dlq_reader.py
+```
+
 ## Live demo script
+
+For the recorded demo video (max 5 minutes), follow the timed script in
+[`DEMO.md`](DEMO.md). The short version:
 
 1. **Terminal 1** — start the consumer normally:
    ```bash
@@ -118,11 +128,13 @@ docker compose down -v    # also wipe topic data for a totally fresh start
 Assignement Chapter 3.pdf  original assignment brief
 Assignment.md              raw extracted assignment text
 Assignment-Explained.md    step-by-step explanation with diagrams
+DEMO.md                    timed script for the 5-minute demo video
 task.md                    task checklist and commit workflow
 diagrams/                  architecture diagrams (.drawio sources + .png exports)
 docker-compose.yml         local Kafka broker (KRaft mode)
 order.avsc                 Avro schema for order messages
 producer.py                order producer (Avro-encoded)
 consumer.py                order consumer (running average, retry, DLQ)
+dlq_reader.py              prints the contents of the DLQ with failure reasons
 requirements.txt           Python dependencies
 ```

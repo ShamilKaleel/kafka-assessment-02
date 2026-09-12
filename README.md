@@ -20,10 +20,15 @@ diagrams).
 
    ```bash
    docker compose up -d
-   docker compose ps   # should show "healthy"
+   docker compose ps   # kafka should show "healthy"
    ```
 
-   The broker is reachable at `localhost:9092`.
+   The broker is reachable at `localhost:9092`. This also starts
+   **Kafka UI**, a dashboard at http://localhost:8080 showing topics,
+   partitions, offsets, consumer-group lag, and messages (it comes up ~30 s
+   after the broker). Message *values* appear as raw bytes there — they're
+   Avro-encoded and there's no schema registry to decode them — but keys,
+   headers, and all the topic/consumer stats are readable.
 
 2. Set up the Python environment:
 
@@ -101,8 +106,10 @@ For the recorded demo video (max 5 minutes), follow the timed script in
    With the producer still running (or send a couple more with
    `--count 3`), you'll see `processing failed (attempt N/3): ...` lines
    up to `--max-attempts` times, then `routed to DLQ key=... -> orders-dlq
-   [...]` — that confirmation line is the DLQ evidence, no separate
-   inspection tool needed.
+   [...]` — that confirmation line is the DLQ evidence.
+4. Open Kafka UI (http://localhost:8080) → Topics → `orders-dlq` → Messages
+   to show the failed messages with their `error` headers, and/or run
+   `dlq_reader.py` to print them decoded in the terminal.
 
 **Tip:** the consumer's group (`order-consumer-group`) keeps its committed
 offset across restarts, so re-running it won't replay old messages. To

@@ -2,7 +2,7 @@
 
 A timed, step-by-step script for recording the demonstration video. Follow
 it top to bottom. Each segment has the exact command to run and a short
-line to say. The whole thing runs about 4 min 15 s, leaving buffer.
+line to say. The whole thing runs about 4 min 20 s, leaving buffer.
 
 ## Before you press record
 
@@ -11,19 +11,22 @@ Do all of this first — none of it needs to be on camera.
 1. Fresh Kafka, so the recording starts from a clean state:
    ```bash
    docker compose down -v && docker compose up -d
-   docker compose ps     # wait until STATUS says "healthy" (~15 s)
+   docker compose ps     # wait until kafka says "healthy" (~15 s)
    ```
-2. Open **two terminals side by side**, both in the project folder, with a
+2. Open **Kafka UI** at http://localhost:8080 in a browser and wait until the
+   `local` cluster shows as online (it starts ~30 s after Kafka is healthy).
+   Leave it on the **Topics** page.
+3. Open **two terminals side by side**, both in the project folder, with a
    large font (the viewer has to read the log lines).
-3. Have these ready to show:
+4. Have these ready to show:
    - `diagrams/03-system-architecture.png` (open in an image viewer)
    - `order.avsc` (open in the editor)
-   - the GitHub repo's **Commits** page in a browser
-4. Nothing running in either terminal yet.
+   - the GitHub repo's **Commits** page in another browser tab
+5. Nothing running in either terminal yet.
 
 ## The recording
 
-### 0:00 — Intro (30 s)
+### 0:00 — Intro (25 s)
 
 Show: `diagrams/03-system-architecture.png`
 
@@ -32,7 +35,7 @@ Kafka, and a consumer reads them. Every message is Avro-encoded. The
 consumer keeps a running average of prices, retries temporary failures, and
 sends permanently failed messages to a dead letter queue."*
 
-### 0:30 — The Avro schema (20 s)
+### 0:25 — The Avro schema (15 s)
 
 Show: `order.avsc`
 
@@ -40,7 +43,7 @@ Say: *"Each order has three fields — orderId, product, and price. This
 schema file is shared by the producer and the consumer, so both sides agree
 on the message format."*
 
-### 0:50 — Normal flow with running average (60 s)
+### 0:40 — Normal flow with running average (55 s)
 
 **Terminal 1** (consumer):
 ```bash
@@ -59,7 +62,7 @@ message — you can see it recalculating live, one message at a time."*
 (On a fresh cluster the consumer prints one `UNKNOWN_TOPIC_OR_PART` line
 before the first order — that's expected; it picks the topic up by itself.)
 
-### 1:50 — Retry logic and Dead Letter Queue (80 s)
+### 1:35 — Retry logic and Dead Letter Queue (70 s)
 
 **Terminal 1**: press `Ctrl+C` to stop the consumer, then restart it with
 simulated failures switched on:
@@ -80,18 +83,32 @@ consumer moves on instead of crashing."*
 Point at the `processing failed (attempt 1/3)` … `(3/3)` lines, then the
 `routed to DLQ` line.
 
-### 3:10 — Inspect the DLQ (30 s)
+### 2:45 — Kafka UI (35 s)
+
+Switch to the browser tab with **Kafka UI** (http://localhost:8080), on the
+**Topics** page. Click **orders-dlq** → **Messages** tab → expand one
+message.
+
+Say: *"In the Kafka dashboard you can see both topics — `orders` with all
+the orders, and `orders-dlq` with the two that failed. Opening a failed
+message shows its headers: the error reason and exactly where it came from."*
+
+(The message *value* shows as raw bytes here — that's the Avro encoding,
+which the dashboard can't decode without a schema registry. The decoded
+orders are shown in the terminal instead.)
+
+### 3:20 — Inspect the DLQ from code (25 s)
 
 **Terminal 1**: `Ctrl+C` to stop the consumer, then:
 ```bash
 .venv/bin/python3 dlq_reader.py
 ```
 
-Say: *"This reads the dead letter queue. Each failed message is kept with
-its original bytes, plus headers saying why it failed and where it came
-from — so nothing is lost and it can be investigated later."*
+Say: *"The same dead letter queue read from code: each failed message with
+its decoded order, the failure reason, and the original offset — nothing is
+lost, and it can be investigated or reprocessed later."*
 
-### 3:40 — Git history (30 s)
+### 3:45 — Git history (25 s)
 
 Show: the GitHub **Commits** page.
 

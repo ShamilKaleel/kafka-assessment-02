@@ -11,7 +11,7 @@ from fastavro.schema import load_schema
 
 BOOTSTRAP_SERVERS = "localhost:9092"
 DLQ_TOPIC = "orders-dlq"
-SCHEMA_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "order.avsc")
+SCHEMA_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "schemas", "order.avsc")
 
 
 def print_message(msg, schema):

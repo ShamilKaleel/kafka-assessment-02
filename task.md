@@ -1,8 +1,12 @@
 # Task List
 
-Working through the assignment (see `Assignment.md` / `Assignment-Explained.md`)
-one task at a time. Each completed task gets its own commit before moving to
-the next.
+Working through the assignment (see `docs/Assignment.md` /
+`docs/Assignment-Explained.md`) one task at a time. Each completed task gets
+its own commit before moving to the next.
+
+(Tasks 0-10 were done with a flat layout; Task 12 moved everything into
+`src/`, `schemas/`, `docker/`, `docs/`, `tests/` — file names below are as
+they were at the time.)
 
 ## Commit convention
 
@@ -67,9 +71,22 @@ the next.
   `Add Kafka UI dashboard for the demo`
 
 - [ ] **11. Submit** — give the marker access to the GitHub repo (it's
-  currently private), record the demo video (max 5 min) following `DEMO.md`,
-  and submit the repo link + video.
+  currently private), record the demo video (max 5 min) following
+  `docs/DEMO.md`, and submit the repo link + video.
   (No commit — done outside the repo.)
+
+- [ ] **12. Demo-friendly restructure** — modular code in folders, colored
+  terminal output, deterministic failure scenarios aligned to the
+  assignment's two failure types (temporary → retry and recover; permanent
+  → DLQ), topics pre-created on startup, and a test suite. One commit per
+  step:
+  - [x] `Move code, schema, docker and docs into folders` — `src/`,
+    `schemas/`, `docker/`, `docs/`, plus a `Makefile` for short commands
+  - [ ] `Split consumer into config, codec, processing and dlq modules`
+  - [ ] `Add colored console output`
+  - [ ] `Replace random failures with producer-driven scenarios`
+  - [ ] `Add kafka-init service to pre-create topics`
+  - [ ] `Add unit and integration tests`
 
 ## Stack
 

@@ -10,8 +10,8 @@ Do all of this first — none of it needs to be on camera.
 
 1. Fresh Kafka, so the recording starts from a clean state:
    ```bash
-   docker compose down -v && docker compose up -d
-   docker compose ps     # wait until kafka says "healthy" (~15 s)
+   make reset            # stop, wipe topic data, start fresh
+   make ps               # wait until kafka says "healthy" (~15 s)
    ```
 2. Open **Kafka UI** at http://localhost:8080 in a browser and wait until the
    `local` cluster shows as online (it starts ~30 s after Kafka is healthy).
@@ -19,8 +19,8 @@ Do all of this first — none of it needs to be on camera.
 3. Open **two terminals side by side**, both in the project folder, with a
    large font (the viewer has to read the log lines).
 4. Have these ready to show:
-   - `diagrams/03-system-architecture.png` (open in an image viewer)
-   - `order.avsc` (open in the editor)
+   - `docs/diagrams/03-system-architecture.png` (open in an image viewer)
+   - `schemas/order.avsc` (open in the editor)
    - the GitHub repo's **Commits** page in another browser tab
 5. Nothing running in either terminal yet.
 
@@ -28,7 +28,7 @@ Do all of this first — none of it needs to be on camera.
 
 ### 0:00 — Intro (25 s)
 
-Show: `diagrams/03-system-architecture.png`
+Show: `docs/diagrams/03-system-architecture.png`
 
 Say: *"This is my Kafka assignment. A producer sends order messages into
 Kafka, and a consumer reads them. Every message is Avro-encoded. The
@@ -37,7 +37,7 @@ sends permanently failed messages to a dead letter queue."*
 
 ### 0:25 — The Avro schema (15 s)
 
-Show: `order.avsc`
+Show: `schemas/order.avsc`
 
 Say: *"Each order has three fields — orderId, product, and price. This
 schema file is shared by the producer and the consumer, so both sides agree
@@ -47,11 +47,11 @@ on the message format."*
 
 **Terminal 1** (consumer):
 ```bash
-.venv/bin/python3 consumer.py
+make consumer
 ```
 **Terminal 2** (producer), a moment later:
 ```bash
-.venv/bin/python3 producer.py --count 8
+make producer ARGS="--count 8"
 ```
 
 Say (while orders scroll in Terminal 1): *"The producer generates random
@@ -67,11 +67,11 @@ before the first order — that's expected; it picks the topic up by itself.)
 **Terminal 1**: press `Ctrl+C` to stop the consumer, then restart it with
 simulated failures switched on:
 ```bash
-.venv/bin/python3 consumer.py --fail-rate 1.0 --max-attempts 3 --retry-delay 1
+make consumer ARGS="--fail-rate 1.0 --max-attempts 3 --retry-delay 1"
 ```
 **Terminal 2**:
 ```bash
-.venv/bin/python3 producer.py --count 2
+make producer ARGS="--count 2"
 ```
 
 Say: *"Nothing in this pipeline fails on its own, so `--fail-rate` injects
@@ -101,7 +101,7 @@ orders are shown in the terminal instead.)
 
 **Terminal 1**: `Ctrl+C` to stop the consumer, then:
 ```bash
-.venv/bin/python3 dlq_reader.py
+make dlq
 ```
 
 Say: *"The same dead letter queue read from code: each failed message with
@@ -131,7 +131,7 @@ Terminal 2:
 ```bash
 .venv/bin/python3 -c "from confluent_kafka import Producer; p = Producer({'bootstrap.servers': 'localhost:9092'}); p.produce('orders', key=b'bad', value=b'not avro'); p.flush()"
 ```
-Terminal 1 shows `routed to DLQ key=bad`, and `dlq_reader.py` shows it with
+Terminal 1 shows `routed to DLQ key=bad`, and `make dlq` shows it with
 reason `decode error: ...`.
 
 ## Recording tips

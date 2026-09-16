@@ -1,3 +1,7 @@
+# Project name pinned so the volume/container names don't change when this
+# file lives in docker/ instead of the repo root.
+name: kafka-assessment-2
+
 services:
   kafka:
     image: apache/kafka:4.3.1

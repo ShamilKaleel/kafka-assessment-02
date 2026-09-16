@@ -13,7 +13,7 @@ from fastavro.schema import load_schema
 
 BOOTSTRAP_SERVERS = "localhost:9092"
 TOPIC = "orders"
-SCHEMA_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "order.avsc")
+SCHEMA_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "schemas", "order.avsc")
 PRODUCTS = ["Item1", "Item2", "Item3", "Item4", "Item5"]
 
 

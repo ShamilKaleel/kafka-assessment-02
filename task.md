@@ -75,7 +75,7 @@ they were at the time.)
   `docs/DEMO.md`, and submit the repo link + video.
   (No commit — done outside the repo.)
 
-- [ ] **12. Demo-friendly restructure** — modular code in folders, colored
+- [x] **12. Demo-friendly restructure** — modular code in folders, colored
   terminal output, deterministic failure scenarios aligned to the
   assignment's two failure types (temporary → retry and recover; permanent
   → DLQ), topics pre-created on startup, and a test suite. One commit per
@@ -86,7 +86,7 @@ they were at the time.)
   - [x] `Add colored console output`
   - [x] `Replace random failures with producer-driven scenarios`
   - [x] `Add kafka-init service to pre-create topics`
-  - [ ] `Add unit and integration tests`
+  - [x] `Add unit and integration tests`
 
 ## Stack
 

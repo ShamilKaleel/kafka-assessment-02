@@ -1,3 +1,4 @@
 confluent-kafka==2.15.0
 fastavro==1.12.2
 rich==15.0.0
+pytest==9.1.1

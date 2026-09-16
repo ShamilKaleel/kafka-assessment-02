@@ -67,31 +67,47 @@ docs/
 ```bash
 make producer                                  # runs forever, ~1 order/sec
 make producer ARGS="--count 5"                 # send exactly 5 then stop
-make producer ARGS="--count 5 --interval 0.2"  # faster, for quick tests
+make producer ARGS="--count 10 --scenario mixed"   # include simulated failures (see below)
+make producer ARGS="--poison"                  # send one message that isn't valid Avro
 # raw: .venv/bin/python -m src.producer --count 5
 ```
 
 **Consumer** — reads from `orders`, Avro-decodes, prints each order with a
-live running average of prices:
+live running average of prices, retries temporary failures, and routes
+permanent failures to the DLQ:
 
 ```bash
 make consumer
+make consumer ARGS="--max-attempts 3 --retry-delay 1"   # the defaults
 # raw: .venv/bin/python -m src.consumer
 ```
 
-Retry/DLQ flags (all optional, pass via `ARGS="..."`):
+### Failure scenarios (how the retry and DLQ paths are demonstrated)
+
+Nothing in this pipeline fails on its own, so the **producer** can tag each
+order with a `simulate-failure` header, and the consumer's processing step
+honours it. The Avro payload itself is never changed — it always has exactly
+the assignment's three fields.
+
+| `--scenario` | Header on the message | What the consumer does | Assignment requirement |
+|---|---|---|---|
+| `normal` (default) | none | succeeds first time → running average updated | real-time aggregation |
+| `transient` | `simulate-failure: transient` | attempt 1 fails ("downstream timeout"), attempt 2 succeeds → **recovered**, counted in the average | retry logic for temporary failures |
+| `permanent` | `simulate-failure: permanent` | every attempt fails ("validation error") → after `--max-attempts` → **DLQ** | Dead Letter Queue for permanently failed messages |
+| `mixed` | repeating cycle: normal, normal, transient, normal, permanent | all of the above in one stream (`--count 10` → 6 normal, 2 recovered, 2 DLQ) | everything at once |
+| `--poison` | (message is not Avro at all) | can't be decoded → straight to the DLQ, no retries | DLQ robustness |
+
+Consumer flags (optional, pass via `ARGS="..."`):
 
 | Flag             | Default | Meaning                                                       |
 |------------------|---------|----------------------------------------------------------------|
-| `--fail-rate`    | `0.0`   | Probability [0-1] a processing attempt simulates a failure. Demo-only knob — nothing in this pipeline fails on its own, so this is how you make the retry/DLQ path actually trigger. |
 | `--max-attempts` | `3`     | Processing attempts before a message is treated as permanently failed. |
 | `--retry-delay`  | `1.0`   | Seconds to wait between attempts.                              |
 
-Permanently failed messages are routed to the `orders-dlq` topic, keyed by
-`orderId`, carrying the original Avro bytes plus headers (`error`,
-`original-topic`, `original-partition`, `original-offset`). This covers both
-orders that still fail after the last attempt and messages that can't be
-Avro-decoded at all (those skip the retries — no retry can fix bad bytes).
+Messages routed to the `orders-dlq` topic keep their key (`orderId`), their
+original Avro bytes and their original headers (so `simulate-failure` is
+still visible), plus new headers `error`, `original-topic`,
+`original-partition`, `original-offset` saying why and where they failed.
 
 Stop either script with `Ctrl+C` — both shut down cleanly. The consumer
 prints a summary table on exit (orders processed, recovered after retry,
@@ -124,23 +140,19 @@ For the recorded demo video (max 5 minutes), follow the timed script in
 [`docs/DEMO.md`](docs/DEMO.md). The short version:
 
 1. **Terminal 1**: `make consumer`
-2. **Terminal 2**: `make producer` — watch orders flow and the running
-   average update live in Terminal 1.
+2. **Terminal 2**: `make producer ARGS="--count 10 --scenario mixed"` —
+   watch Terminal 1: green `RECEIVED` lines with the running average, yellow
+   `RETRY` then bold-green `RECOVERED` for the transient failures, and red
+   `FAILED` → `DLQ` for the permanent ones.
 
    On a brand-new cluster the consumer prints one
    `consumer error: ... UNKNOWN_TOPIC_OR_PART` line while it waits for the
    producer to create the `orders` topic — expected; it picks the topic up
    by itself within a few seconds.
-3. Stop the consumer (`Ctrl+C`), then restart it with simulated failures on
-   to show the retry → DLQ path:
-   `make consumer ARGS="--fail-rate 1.0 --max-attempts 3 --retry-delay 1"`.
-   With the producer still running (or send a couple more with
-   `ARGS="--count 3"`), you'll see `processing failed (attempt N/3): ...`
-   lines up to `--max-attempts` times, then `routed to DLQ key=... ->
-   orders-dlq [...]` — that confirmation line is the DLQ evidence.
-4. Open Kafka UI (http://localhost:8080) → Topics → `orders-dlq` → Messages
-   to show the failed messages with their `error` headers, and/or `make dlq`
-   to print them decoded in the terminal.
+3. Open Kafka UI (http://localhost:8080) → Topics → `orders-dlq` → Messages
+   to show the failed messages with their `simulate-failure` and `error`
+   headers, and/or `make dlq` to print them decoded in the terminal.
+4. `Ctrl+C` the consumer to see the summary table.
 
 **Tip:** the consumer's group (`order-consumer-group`) keeps its committed
 offset across restarts, so re-running it won't replay old messages. The

@@ -4,9 +4,15 @@ A timed, step-by-step script for recording the demonstration video. Follow
 it top to bottom. Each segment has the exact command to run and a short
 line to say. The whole thing runs about 4 min 20 s, leaving buffer.
 
+The demo uses **one** consumer run. The producer sends a mix of normal
+orders, orders that fail once and recover (retry), and orders that fail
+permanently (Dead Letter Queue) — so every requirement shows up in the same
+stream, color-coded.
+
 ## Before you press record
 
-Do all of this first — none of it needs to be on camera.
+Do all of this first — none of it needs to be on camera. Run every command
+from the project folder.
 
 1. Fresh Kafka, so the recording starts from a clean state:
    ```bash
@@ -43,7 +49,7 @@ Say: *"Each order has three fields — orderId, product, and price. This
 schema file is shared by the producer and the consumer, so both sides agree
 on the message format."*
 
-### 0:40 — Normal flow with running average (55 s)
+### 0:40 — Everything in one run (90 s)
 
 **Terminal 1** (consumer):
 ```bash
@@ -51,88 +57,88 @@ make consumer
 ```
 **Terminal 2** (producer), a moment later:
 ```bash
-make producer ARGS="--count 8"
+make producer ARGS="--count 10 --scenario mixed"
 ```
 
-Say (while orders scroll in Terminal 1): *"The producer generates random
-orders and sends them Avro-encoded to the `orders` topic. The consumer
-decodes each one and updates the running average price after every
-message — you can see it recalculating live, one message at a time."*
+The producer sends 10 orders: 6 normal, 2 tagged *transient*, 2 tagged
+*permanent* (the tag shows at the end of each `SENT` line). Narrate what
+appears in Terminal 1, colour by colour:
+
+- green `RECEIVED` lines — *"Each order is decoded from Avro and the running
+  average price is recalculated after every message — live, one at a time."*
+- yellow `RETRY` then bold-green `RECOVERED` — *"This order failed with a
+  temporary error. The consumer waited and tried again, and the second
+  attempt succeeded — so it's still counted in the average. That's the retry
+  logic for temporary failures."*
+- yellow `RETRY`, `RETRY`, red `FAILED` then red `DLQ` — *"This one fails
+  every time. After three attempts it's treated as permanently failed and
+  routed to the `orders-dlq` topic — and the consumer moves on instead of
+  crashing."*
+
+(Nothing in the pipeline fails on its own, so the producer adds a
+`simulate-failure` header to request these failures. The order data itself
+is never changed.)
 
 (On a fresh cluster the consumer prints one `UNKNOWN_TOPIC_OR_PART` line
 before the first order — that's expected; it picks the topic up by itself.)
 
-### 1:35 — Retry logic and Dead Letter Queue (70 s)
+### 2:10 — Kafka UI (35 s)
 
-**Terminal 1**: press `Ctrl+C` to stop the consumer, then restart it with
-simulated failures switched on:
-```bash
-make consumer ARGS="--fail-rate 1.0 --max-attempts 3 --retry-delay 1"
-```
-**Terminal 2**:
-```bash
-make producer ARGS="--count 2"
-```
+Switch to the browser tab with **Kafka UI**, on the **Topics** page. Click
+**orders-dlq** → **Messages** tab → expand one message.
 
-Say: *"Nothing in this pipeline fails on its own, so `--fail-rate` injects
-failures for the demo. Watch: each order fails, the consumer waits and
-retries — three attempts. When the last attempt fails, the message is
-treated as permanently failed and routed to the `orders-dlq` topic, and the
-consumer moves on instead of crashing."*
-
-Point at the `processing failed (attempt 1/3)` … `(3/3)` lines, then the
-`routed to DLQ` line.
-
-### 2:45 — Kafka UI (35 s)
-
-Switch to the browser tab with **Kafka UI** (http://localhost:8080), on the
-**Topics** page. Click **orders-dlq** → **Messages** tab → expand one
-message.
-
-Say: *"In the Kafka dashboard you can see both topics — `orders` with all
-the orders, and `orders-dlq` with the two that failed. Opening a failed
-message shows its headers: the error reason and exactly where it came from."*
+Say: *"The Kafka dashboard shows both topics — `orders` with all ten orders,
+and `orders-dlq` with the two that failed permanently. Opening a failed
+message shows its headers: the error reason, where it came from, and the
+failure tag that was requested."*
 
 (The message *value* shows as raw bytes here — that's the Avro encoding,
 which the dashboard can't decode without a schema registry. The decoded
 orders are shown in the terminal instead.)
 
-### 3:20 — Inspect the DLQ from code (25 s)
+### 2:45 — The DLQ from code (25 s)
 
-**Terminal 1**: `Ctrl+C` to stop the consumer, then:
+**Terminal 2**:
 ```bash
 make dlq
 ```
 
-Say: *"The same dead letter queue read from code: each failed message with
-its decoded order, the failure reason, and the original offset — nothing is
-lost, and it can be investigated or reprocessed later."*
+Say: *"The same dead letter queue read from code: each failed message
+decoded, with the reason and the original offset — nothing is lost, and it
+can be investigated or reprocessed later."*
 
-### 3:45 — Git history (25 s)
+### 3:10 — Consumer summary (15 s)
+
+**Terminal 1**: press `Ctrl+C`.
+
+Say: *"Stopping the consumer prints a summary: eight orders processed, two
+of them recovered after a retry, two sent to the dead letter queue, and the
+final running average."*
+
+### 3:25 — Git history (25 s)
 
 Show: the GitHub **Commits** page.
 
 Say: *"The project was built step by step in Git — one commit per feature:
 Docker setup, Avro schema, producer, consumer, running average, retry logic,
-DLQ, and documentation."*
+DLQ, documentation, and then restructured into modules with tests."*
 
-### 4:10 — Wrap-up (10 s)
+### 3:50 — Wrap-up (10 s)
 
 Say: *"That's the full pipeline: Avro serialization, real-time aggregation,
 retry logic, and a dead letter queue. Thank you."*
 
 Stop recording.
 
-## Optional extra (only if you have time left)
+## Optional extras (only if you have time left)
 
-Show that even an *undecodable* message goes to the DLQ instead of crashing
-the consumer. With the consumer running normally (no `--fail-rate`), in
-Terminal 2:
-```bash
-.venv/bin/python3 -c "from confluent_kafka import Producer; p = Producer({'bootstrap.servers': 'localhost:9092'}); p.produce('orders', key=b'bad', value=b'not avro'); p.flush()"
-```
-Terminal 1 shows `routed to DLQ key=bad`, and `make dlq` shows it with
-reason `decode error: ...`.
+- **Poison message** — even a message that isn't valid Avro goes to the DLQ
+  instead of crashing the consumer. With the consumer running, in Terminal 2:
+  ```bash
+  make producer ARGS="--poison"
+  ```
+  Terminal 1 shows a red `DLQ #poison` line, and `make dlq` shows it with the
+  reason `decode error: ...`.
 
 ## Recording tips
 

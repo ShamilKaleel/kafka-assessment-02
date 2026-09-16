@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from confluent_kafka import Consumer, Producer
 
 from src import avro_codec, config, console
+from src.config import SIMULATE_HEADER
 from src.dlq import send_to_dlq
 from src.processing import ProcessingError, RunningAverage, process_with_retry
 
@@ -25,14 +26,12 @@ class Stats:
 class OrderConsumer:
     def __init__(self, topic=config.ORDERS_TOPIC, dlq_topic=config.DLQ_TOPIC,
                  group_id=config.CONSUMER_GROUP, bootstrap_servers=config.BOOTSTRAP_SERVERS,
-                 max_attempts=config.MAX_ATTEMPTS, retry_delay=config.RETRY_DELAY_SECONDS,
-                 fail_rate=0.0):
+                 max_attempts=config.MAX_ATTEMPTS, retry_delay=config.RETRY_DELAY_SECONDS):
         self.topic = topic
         self.dlq_topic = dlq_topic
         self.group_id = group_id
         self.max_attempts = max_attempts
         self.retry_delay = retry_delay
-        self.fail_rate = fail_rate
         self.consumer = Consumer({
             "bootstrap.servers": bootstrap_servers,
             "group.id": group_id,
@@ -81,9 +80,11 @@ class OrderConsumer:
             self._to_dlq(msg, f"decode error: {e}")
             return
 
+        headers = {k: v.decode() for k, v in (msg.headers() or [])}
+        simulate = headers.get(SIMULATE_HEADER)
         try:
             attempt = process_with_retry(
-                order, self.fail_rate, self.max_attempts, self.retry_delay,
+                order, simulate, self.max_attempts, self.retry_delay,
                 on_failure=lambda attempt, error, will_retry: self._on_failure(order, attempt, error, will_retry),
             )
         except ProcessingError as e:
@@ -119,13 +120,11 @@ class OrderConsumer:
 
 def main():
     parser = argparse.ArgumentParser(description="Order consumer: running average, retry logic, DLQ")
-    parser.add_argument("--fail-rate", type=float, default=0.0, help="probability [0-1] a processing attempt simulates a failure (default: 0.0, off)")
     parser.add_argument("--max-attempts", type=int, default=config.MAX_ATTEMPTS, help=f"processing attempts before a message is treated as permanently failed (default: {config.MAX_ATTEMPTS})")
     parser.add_argument("--retry-delay", type=float, default=config.RETRY_DELAY_SECONDS, help=f"seconds to wait between attempts (default: {config.RETRY_DELAY_SECONDS})")
     args = parser.parse_args()
 
-    OrderConsumer(max_attempts=args.max_attempts, retry_delay=args.retry_delay,
-                  fail_rate=args.fail_rate).run()
+    OrderConsumer(max_attempts=args.max_attempts, retry_delay=args.retry_delay).run()
 
 
 if __name__ == "__main__":

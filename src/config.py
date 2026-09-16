@@ -12,3 +12,7 @@ MAX_ATTEMPTS = 3
 RETRY_DELAY_SECONDS = 1.0
 
 SCHEMA_PATH = Path(__file__).resolve().parent.parent / "schemas" / "order.avsc"
+
+# Message header the producer uses to request a simulated failure
+# ("transient" or "permanent") so the retry and DLQ paths can be demonstrated.
+SIMULATE_HEADER = "simulate-failure"

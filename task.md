@@ -84,7 +84,7 @@ they were at the time.)
     `schemas/`, `docker/`, `docs/`, plus a `Makefile` for short commands
   - [x] `Split consumer into config, codec, processing and dlq modules`
   - [x] `Add colored console output`
-  - [ ] `Replace random failures with producer-driven scenarios`
+  - [x] `Replace random failures with producer-driven scenarios`
   - [ ] `Add kafka-init service to pre-create topics`
   - [ ] `Add unit and integration tests`
 

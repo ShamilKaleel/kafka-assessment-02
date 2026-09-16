@@ -7,7 +7,7 @@ import time
 
 from confluent_kafka import Producer
 
-from src import avro_codec, config
+from src import avro_codec, config, console
 
 PRODUCTS = ["Item1", "Item2", "Item3", "Item4", "Item5"]
 
@@ -20,32 +20,29 @@ def random_order(order_id: int) -> dict:
     }
 
 
-def delivery_report(err, msg):
+def delivery_report(order, err, msg):
     if err is not None:
-        print(f"delivery failed: {err}", flush=True)
+        console.error(f"delivery failed for #{order['orderId']}: {err}")
     else:
-        print(
-            f"sent orderId={msg.key().decode()} -> "
-            f"{msg.topic()} [partition {msg.partition()}, offset {msg.offset()}]",
-            flush=True,
-        )
+        console.sent(order, msg.topic(), msg.partition(), msg.offset())
 
 
 def send_orders(count=None, interval=1.0, topic=config.ORDERS_TOPIC,
                 bootstrap_servers=config.BOOTSTRAP_SERVERS, start_id=1001):
     """Send `count` random orders (None = forever), one every `interval` seconds."""
+    console.banner("Order producer", topic=topic, count=count or "until Ctrl+C", interval=f"{interval}s")
     producer = Producer({"bootstrap.servers": bootstrap_servers})
     sent = 0
     try:
         while count is None or sent < count:
             order = random_order(start_id + sent)
-            producer.produce(topic, key=order["orderId"].encode(),
-                             value=avro_codec.encode(order), callback=delivery_report)
+            producer.produce(topic, key=order["orderId"].encode(), value=avro_codec.encode(order),
+                             callback=lambda err, msg, order=order: delivery_report(order, err, msg))
             producer.poll(0)
             sent += 1
             time.sleep(interval)
     except KeyboardInterrupt:
-        print("\nstopping...", flush=True)
+        console.info("\nstopping...")
     finally:
         producer.flush()
     return sent

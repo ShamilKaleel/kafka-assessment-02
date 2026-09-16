@@ -93,10 +93,25 @@ Permanently failed messages are routed to the `orders-dlq` topic, keyed by
 orders that still fail after the last attempt and messages that can't be
 Avro-decoded at all (those skip the retries — no retry can fix bad bytes).
 
-Stop either script with `Ctrl+C` — both shut down cleanly.
+Stop either script with `Ctrl+C` — both shut down cleanly. The consumer
+prints a summary table on exit (orders processed, recovered after retry,
+sent to DLQ, final running average).
 
-**Inspect the DLQ** — prints every message in `orders-dlq` with the reason
-it failed and where it came from:
+**Reading the terminal output** — every line is color-coded so the flow is
+easy to follow on screen:
+
+| Color        | Line         | Meaning                                              |
+|--------------|--------------|------------------------------------------------------|
+| green        | `SENT` / `RECEIVED` | order sent / order processed, running average updated |
+| yellow       | `RETRY`      | an attempt failed, waiting and trying again          |
+| bold green   | `RECOVERED`  | succeeded after one or more retries                  |
+| bold red     | `FAILED` / `DLQ` | last attempt failed / message routed to `orders-dlq` |
+| cyan         | banners, info | configuration at startup, summary on exit           |
+
+Colors switch off automatically when output is redirected to a file.
+
+**Inspect the DLQ** — prints a table of every message in `orders-dlq` with
+the reason it failed and where it came from:
 
 ```bash
 make dlq

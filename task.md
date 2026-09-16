@@ -82,8 +82,8 @@ they were at the time.)
   step:
   - [x] `Move code, schema, docker and docs into folders` — `src/`,
     `schemas/`, `docker/`, `docs/`, plus a `Makefile` for short commands
-  - [ ] `Split consumer into config, codec, processing and dlq modules`
-  - [ ] `Add colored console output`
+  - [x] `Split consumer into config, codec, processing and dlq modules`
+  - [x] `Add colored console output`
   - [ ] `Replace random failures with producer-driven scenarios`
   - [ ] `Add kafka-init service to pre-create topics`
   - [ ] `Add unit and integration tests`

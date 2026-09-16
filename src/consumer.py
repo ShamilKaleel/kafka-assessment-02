@@ -9,7 +9,7 @@ from dataclasses import dataclass
 
 from confluent_kafka import Consumer, Producer
 
-from src import avro_codec, config
+from src import avro_codec, config, console
 from src.dlq import send_to_dlq
 from src.processing import ProcessingError, RunningAverage, process_with_retry
 
@@ -29,6 +29,7 @@ class OrderConsumer:
                  fail_rate=0.0):
         self.topic = topic
         self.dlq_topic = dlq_topic
+        self.group_id = group_id
         self.max_attempts = max_attempts
         self.retry_delay = retry_delay
         self.fail_rate = fail_rate
@@ -44,6 +45,8 @@ class OrderConsumer:
     def run(self, max_messages=None, timeout=None) -> Stats:
         """Consume until Ctrl+C, or until max_messages reached a final state
         (processed or DLQ'd), or timeout seconds have passed."""
+        console.banner("Order consumer", topic=self.topic, dlq=self.dlq_topic,
+                       group=self.group_id, attempts=self.max_attempts, delay=f"{self.retry_delay}s")
         self.consumer.subscribe([self.topic])
         deadline = time.monotonic() + timeout if timeout else None
         finished = 0
@@ -58,15 +61,16 @@ class OrderConsumer:
                 if msg is None:
                     continue
                 if msg.error():
-                    print(f"consumer error: {msg.error()}", flush=True)
+                    console.error(f"consumer error: {msg.error()}")
                     continue
                 self.handle(msg)
                 finished += 1
         except KeyboardInterrupt:
-            print("\nstopping...", flush=True)
+            console.info("\nstopping...")
         finally:
             self.consumer.close()
             self.dlq_producer.flush()
+            console.summary(self.stats.processed, self.stats.recovered, self.stats.dlq, self.stats.average)
         return self.stats
 
     def handle(self, msg):
@@ -78,8 +82,10 @@ class OrderConsumer:
             return
 
         try:
-            attempt = process_with_retry(order, self.fail_rate, self.max_attempts,
-                                         self.retry_delay, on_failure=self._on_failure)
+            attempt = process_with_retry(
+                order, self.fail_rate, self.max_attempts, self.retry_delay,
+                on_failure=lambda attempt, error, will_retry: self._on_failure(order, attempt, error, will_retry),
+            )
         except ProcessingError as e:
             self._to_dlq(msg, str(e))
             return
@@ -89,16 +95,14 @@ class OrderConsumer:
         self.stats.average = avg
         if attempt > 1:
             self.stats.recovered += 1
-        print(
-            f"received orderId={order['orderId']} product={order['product']} "
-            f"price={order['price']:.2f} | running avg={avg:.2f} (n={self.running_average.count}) "
-            f"[partition {msg.partition()}, offset {msg.offset()}]",
-            flush=True,
-        )
+            console.recovered(order["orderId"], attempt)
+        console.received(order, avg, self.running_average.count, msg.partition(), msg.offset())
 
-    def _on_failure(self, attempt, error, will_retry):
-        outcome = f"retrying in {self.retry_delay}s" if will_retry else "giving up"
-        print(f"processing failed (attempt {attempt}/{self.max_attempts}): {error} - {outcome}", flush=True)
+    def _on_failure(self, order, attempt, error, will_retry):
+        if will_retry:
+            console.retry(order["orderId"], attempt, self.max_attempts, str(error), self.retry_delay)
+        else:
+            console.gave_up(order["orderId"], self.max_attempts, str(error))
 
     def _to_dlq(self, msg, reason):
         send_to_dlq(self.dlq_producer, msg, reason, self.dlq_topic, on_delivery=self._dlq_delivery_report)
@@ -108,13 +112,9 @@ class OrderConsumer:
     def _dlq_delivery_report(err, msg):
         key = msg.key().decode() if msg.key() else "<none>"
         if err is not None:
-            print(f"DLQ delivery failed for key={key}: {err}", flush=True)
+            console.error(f"DLQ delivery failed for key={key}: {err}")
         else:
-            print(
-                f"routed to DLQ key={key} -> {msg.topic()} "
-                f"[partition {msg.partition()}, offset {msg.offset()}]",
-                flush=True,
-            )
+            console.dlq(key, msg.topic(), msg.partition(), msg.offset())
 
 
 def main():

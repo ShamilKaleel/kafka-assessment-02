@@ -1,136 +1,131 @@
 #!/usr/bin/env python3
 """Consumer: reads Avro-encoded orders from Kafka, keeps a running average
-of prices, retries temporary failures, and routes permanent failures to a
+of prices, retries temporary failures, and routes permanent failures to the
 Dead Letter Queue."""
 
 import argparse
-import io
-import os
-import random
 import time
+from dataclasses import dataclass
 
 from confluent_kafka import Consumer, Producer
-from fastavro import schemaless_reader
-from fastavro.schema import load_schema
 
-BOOTSTRAP_SERVERS = "localhost:9092"
-TOPIC = "orders"
-DLQ_TOPIC = "orders-dlq"
-SCHEMA_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "schemas", "order.avsc")
-GROUP_ID = "order-consumer-group"
+from src import avro_codec, config
+from src.dlq import send_to_dlq
+from src.processing import ProcessingError, RunningAverage, process_with_retry
 
 
-class ProcessingError(Exception):
-    pass
+@dataclass
+class Stats:
+    processed: int = 0   # orders that succeeded (first try or after retries)
+    recovered: int = 0   # ...of which needed at least one retry
+    dlq: int = 0         # messages routed to the DLQ
+    average: float = 0.0
 
 
-def process_order(order, fail_rate):
-    """The unit of work for one order.
+class OrderConsumer:
+    def __init__(self, topic=config.ORDERS_TOPIC, dlq_topic=config.DLQ_TOPIC,
+                 group_id=config.CONSUMER_GROUP, bootstrap_servers=config.BOOTSTRAP_SERVERS,
+                 max_attempts=config.MAX_ATTEMPTS, retry_delay=config.RETRY_DELAY_SECONDS,
+                 fail_rate=0.0):
+        self.topic = topic
+        self.dlq_topic = dlq_topic
+        self.max_attempts = max_attempts
+        self.retry_delay = retry_delay
+        self.fail_rate = fail_rate
+        self.consumer = Consumer({
+            "bootstrap.servers": bootstrap_servers,
+            "group.id": group_id,
+            "auto.offset.reset": "earliest",
+        })
+        self.dlq_producer = Producer({"bootstrap.servers": bootstrap_servers})
+        self.running_average = RunningAverage()
+        self.stats = Stats()
 
-    Nothing in this pipeline can fail on its own, so fail_rate (default 0.0)
-    injects a transient failure with that probability to exercise the retry
-    and DLQ paths.
-    """
-    if fail_rate and random.random() < fail_rate:
-        raise ProcessingError(f"simulated transient failure for orderId={order['orderId']}")
-
-
-def process_with_retry(order, fail_rate, max_attempts, retry_delay):
-    for attempt in range(1, max_attempts + 1):
+    def run(self, max_messages=None, timeout=None) -> Stats:
+        """Consume until Ctrl+C, or until max_messages reached a final state
+        (processed or DLQ'd), or timeout seconds have passed."""
+        self.consumer.subscribe([self.topic])
+        deadline = time.monotonic() + timeout if timeout else None
+        finished = 0
         try:
-            process_order(order, fail_rate)
+            while True:
+                if max_messages is not None and finished >= max_messages:
+                    break
+                if deadline and time.monotonic() > deadline:
+                    break
+                self.dlq_producer.poll(0)
+                msg = self.consumer.poll(1.0)
+                if msg is None:
+                    continue
+                if msg.error():
+                    print(f"consumer error: {msg.error()}", flush=True)
+                    continue
+                self.handle(msg)
+                finished += 1
+        except KeyboardInterrupt:
+            print("\nstopping...", flush=True)
+        finally:
+            self.consumer.close()
+            self.dlq_producer.flush()
+        return self.stats
+
+    def handle(self, msg):
+        try:
+            order = avro_codec.decode(msg.value())
+        except Exception as e:
+            # Undecodable bytes are permanently failed: no retry can fix them.
+            self._to_dlq(msg, f"decode error: {e}")
             return
+
+        try:
+            attempt = process_with_retry(order, self.fail_rate, self.max_attempts,
+                                         self.retry_delay, on_failure=self._on_failure)
         except ProcessingError as e:
-            print(f"processing failed (attempt {attempt}/{max_attempts}): {e}", flush=True)
-            if attempt < max_attempts:
-                time.sleep(retry_delay)
-            else:
-                raise ProcessingError(f"failed after {max_attempts} attempts: {e}") from None
+            self._to_dlq(msg, str(e))
+            return
 
-
-def dlq_delivery_report(err, msg):
-    key = msg.key().decode() if msg.key() else "<none>"
-    if err is not None:
-        print(f"DLQ delivery failed for key={key}: {err}", flush=True)
-    else:
+        avg = self.running_average.add(order["price"])
+        self.stats.processed += 1
+        self.stats.average = avg
+        if attempt > 1:
+            self.stats.recovered += 1
         print(
-            f"routed to DLQ key={key} -> "
-            f"{msg.topic()} [partition {msg.partition()}, offset {msg.offset()}]",
+            f"received orderId={order['orderId']} product={order['product']} "
+            f"price={order['price']:.2f} | running avg={avg:.2f} (n={self.running_average.count}) "
+            f"[partition {msg.partition()}, offset {msg.offset()}]",
             flush=True,
         )
 
+    def _on_failure(self, attempt, error, will_retry):
+        outcome = f"retrying in {self.retry_delay}s" if will_retry else "giving up"
+        print(f"processing failed (attempt {attempt}/{self.max_attempts}): {error} - {outcome}", flush=True)
 
-def send_to_dlq(dlq_producer, msg, reason):
-    dlq_producer.produce(
-        DLQ_TOPIC,
-        key=msg.key(),
-        value=msg.value(),
-        headers={
-            "error": reason.encode(),
-            "original-topic": msg.topic().encode(),
-            "original-partition": str(msg.partition()).encode(),
-            "original-offset": str(msg.offset()).encode(),
-        },
-        callback=dlq_delivery_report,
-    )
+    def _to_dlq(self, msg, reason):
+        send_to_dlq(self.dlq_producer, msg, reason, self.dlq_topic, on_delivery=self._dlq_delivery_report)
+        self.stats.dlq += 1
+
+    @staticmethod
+    def _dlq_delivery_report(err, msg):
+        key = msg.key().decode() if msg.key() else "<none>"
+        if err is not None:
+            print(f"DLQ delivery failed for key={key}: {err}", flush=True)
+        else:
+            print(
+                f"routed to DLQ key={key} -> {msg.topic()} "
+                f"[partition {msg.partition()}, offset {msg.offset()}]",
+                flush=True,
+            )
 
 
 def main():
     parser = argparse.ArgumentParser(description="Order consumer: running average, retry logic, DLQ")
     parser.add_argument("--fail-rate", type=float, default=0.0, help="probability [0-1] a processing attempt simulates a failure (default: 0.0, off)")
-    parser.add_argument("--max-attempts", type=int, default=3, help="processing attempts before a message is treated as permanently failed (default: 3)")
-    parser.add_argument("--retry-delay", type=float, default=1.0, help="seconds to wait between attempts (default: 1.0)")
+    parser.add_argument("--max-attempts", type=int, default=config.MAX_ATTEMPTS, help=f"processing attempts before a message is treated as permanently failed (default: {config.MAX_ATTEMPTS})")
+    parser.add_argument("--retry-delay", type=float, default=config.RETRY_DELAY_SECONDS, help=f"seconds to wait between attempts (default: {config.RETRY_DELAY_SECONDS})")
     args = parser.parse_args()
 
-    schema = load_schema(SCHEMA_PATH)
-    consumer = Consumer({
-        "bootstrap.servers": BOOTSTRAP_SERVERS,
-        "group.id": GROUP_ID,
-        "auto.offset.reset": "earliest",
-    })
-    consumer.subscribe([TOPIC])
-    dlq_producer = Producer({"bootstrap.servers": BOOTSTRAP_SERVERS})
-
-    total_price = 0.0
-    count = 0
-
-    try:
-        while True:
-            dlq_producer.poll(0)
-            msg = consumer.poll(1.0)
-            if msg is None:
-                continue
-            if msg.error():
-                print(f"consumer error: {msg.error()}", flush=True)
-                continue
-
-            try:
-                order = schemaless_reader(io.BytesIO(msg.value()), schema)
-            except Exception as e:
-                # Undecodable bytes are permanently failed: no retry can fix them.
-                send_to_dlq(dlq_producer, msg, f"decode error: {e}")
-                continue
-
-            try:
-                process_with_retry(order, args.fail_rate, args.max_attempts, args.retry_delay)
-            except ProcessingError as e:
-                send_to_dlq(dlq_producer, msg, str(e))
-                continue
-
-            count += 1
-            total_price += order["price"]
-            running_avg = total_price / count
-            print(
-                f"received orderId={order['orderId']} product={order['product']} "
-                f"price={order['price']:.2f} | running avg={running_avg:.2f} (n={count}) "
-                f"[partition {msg.partition()}, offset {msg.offset()}]",
-                flush=True,
-            )
-    except KeyboardInterrupt:
-        print("\nstopping...", flush=True)
-    finally:
-        consumer.close()
-        dlq_producer.flush()
+    OrderConsumer(max_attempts=args.max_attempts, retry_delay=args.retry_delay,
+                  fail_rate=args.fail_rate).run()
 
 
 if __name__ == "__main__":

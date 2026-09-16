@@ -17,7 +17,8 @@ from the project folder.
 1. Fresh Kafka, so the recording starts from a clean state:
    ```bash
    make reset            # stop, wipe topic data, start fresh
-   make ps               # wait until kafka says "healthy" (~15 s)
+   make ps               # wait until kafka says "healthy" (~15 s);
+                         # kafka-init shows "Exited (0)" = topics created
    ```
 2. Open **Kafka UI** at http://localhost:8080 in a browser and wait until the
    `local` cluster shows as online (it starts ~30 s after Kafka is healthy).
@@ -78,9 +79,6 @@ appears in Terminal 1, colour by colour:
 (Nothing in the pipeline fails on its own, so the producer adds a
 `simulate-failure` header to request these failures. The order data itself
 is never changed.)
-
-(On a fresh cluster the consumer prints one `UNKNOWN_TOPIC_OR_PART` line
-before the first order — that's expected; it picks the topic up by itself.)
 
 ### 2:10 — Kafka UI (35 s)
 

@@ -30,6 +30,18 @@ services:
       retries: 10
       start_period: 20s
 
+  # One-shot: creates the "orders" and "orders-dlq" topics once the broker is
+  # healthy, then exits (shows as "exited (0)" in docker compose ps -a).
+  kafka-init:
+    image: apache/kafka:4.3.1
+    container_name: kafka-init-assessment2
+    entrypoint: ["/bin/sh", "/create-topics.sh"]
+    volumes:
+      - ./create-topics.sh:/create-topics.sh:ro
+    depends_on:
+      kafka:
+        condition: service_healthy
+
   kafka-ui:
     image: kafbat/kafka-ui:latest
     container_name: kafka-ui-assessment2
@@ -39,8 +51,8 @@ services:
       KAFKA_CLUSTERS_0_NAME: local
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
     depends_on:
-      kafka:
-        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
 
 volumes:
   kafka-assessment2-data:

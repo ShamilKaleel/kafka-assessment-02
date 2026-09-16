@@ -22,7 +22,8 @@ src/                       Python code (run as: python -m src.<module>)
 schemas/
   order.avsc               Avro schema for order messages
 docker/
-  docker-compose.yml       local Kafka broker (KRaft mode) + Kafka UI
+  docker-compose.yml       local Kafka broker (KRaft mode) + topic init + Kafka UI
+  create-topics.sh         creates the orders and orders-dlq topics on startup
 docs/
   Assignment.md            raw extracted assignment text
   Assignment-Explained.md  step-by-step explanation with diagrams
@@ -51,6 +52,10 @@ docs/
    make up          # = docker compose -f docker/docker-compose.yml up -d
    make ps          # kafka should show "healthy"
    ```
+
+   This starts three containers: the Kafka broker, a one-shot `kafka-init`
+   that creates the `orders` and `orders-dlq` topics and then exits (it shows
+   as `Exited (0)` in `make ps` — that's success), and Kafka UI.
 
    The broker is reachable at `localhost:9092`. **Kafka UI** is a dashboard
    at http://localhost:8080 showing topics, partitions, offsets,
@@ -144,11 +149,6 @@ For the recorded demo video (max 5 minutes), follow the timed script in
    watch Terminal 1: green `RECEIVED` lines with the running average, yellow
    `RETRY` then bold-green `RECOVERED` for the transient failures, and red
    `FAILED` → `DLQ` for the permanent ones.
-
-   On a brand-new cluster the consumer prints one
-   `consumer error: ... UNKNOWN_TOPIC_OR_PART` line while it waits for the
-   producer to create the `orders` topic — expected; it picks the topic up
-   by itself within a few seconds.
 3. Open Kafka UI (http://localhost:8080) → Topics → `orders-dlq` → Messages
    to show the failed messages with their `simulate-failure` and `error`
    headers, and/or `make dlq` to print them decoded in the terminal.

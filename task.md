@@ -85,7 +85,7 @@ they were at the time.)
   - [x] `Split consumer into config, codec, processing and dlq modules`
   - [x] `Add colored console output`
   - [x] `Replace random failures with producer-driven scenarios`
-  - [ ] `Add kafka-init service to pre-create topics`
+  - [x] `Add kafka-init service to pre-create topics`
   - [ ] `Add unit and integration tests`
 
 ## Stack

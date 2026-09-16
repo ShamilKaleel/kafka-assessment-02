@@ -115,3 +115,6 @@ A reasonable build order:
 5. Add retry logic (simulate a failure on purpose to test it).
 6. Add the `orders-dlq` topic and the logic to push permanently-failed
    messages there.
+7. Make it easy to demonstrate: deterministic failure scenarios the producer
+   can request (`--scenario transient|permanent|mixed`), colored output,
+   and a test suite that checks each requirement (see the README).

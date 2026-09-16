@@ -36,6 +36,7 @@ class OrderConsumer:
             "bootstrap.servers": bootstrap_servers,
             "group.id": group_id,
             "auto.offset.reset": "earliest",
+            "log_level": 3,  # errors only; hides librdkafka notices during shutdown
         })
         self.dlq_producer = Producer({"bootstrap.servers": bootstrap_servers})
         self.running_average = RunningAverage()

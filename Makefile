@@ -6,7 +6,7 @@ ARGS     ?=
 
 help:
 	@echo "make venv       create .venv and install dependencies"
-	@echo "make up         start Kafka + Kafka UI (http://localhost:8080)"
+	@echo "make up         start Kafka + Provectus Kafka UI (http://localhost:8080)"
 	@echo "make down       stop them (keeps topic data)"
 	@echo "make reset      stop, wipe topic data, start fresh"
 	@echo "make ps         show container status"

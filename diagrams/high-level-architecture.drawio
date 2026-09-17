@@ -1,9 +1,9 @@
 <mxfile host="65bd71144e">
     <diagram name="High-level overview" id="high-level-overview">
-        <mxGraphModel dx="1600" dy="827" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="700" background="#FFFFFF" math="0" shadow="0">
+        <mxGraphModel dx="1508" dy="648" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="700" background="#FFFFFF" math="0" shadow="0">
             <root>
                 <mxCell id="0"/>
-                <mxCell id="1" parent="0"/>
+                <mxCell id="1" style="" parent="0"/>
                 <mxCell id="title" value="Order pipeline — high-level overview" style="text;html=1;align=left;verticalAlign=middle;fontSize=15;fontStyle=1;fontColor=#333333;" parent="1" vertex="1">
                     <mxGeometry x="40" y="20" width="420" height="30" as="geometry"/>
                 </mxCell>
@@ -64,7 +64,7 @@
                 <mxCell id="decode" value="Avro decode&#xa;order.avsc" style="rounded=1;arcSize=50;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=12;fontStyle=1;" parent="1" vertex="1">
                     <mxGeometry x="1030" y="109" width="140" height="50" as="geometry"/>
                 </mxCell>
-                <mxCell id="decodeD" value="Decoded OK?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;fontStyle=1;" parent="1" vertex="1">
+                <mxCell id="decodeD" value="Decoded OK?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;fontStyle=1;" vertex="1" parent="1">
                     <mxGeometry x="1030" y="178" width="140" height="66" as="geometry"/>
                 </mxCell>
                 <mxCell id="process" value="Process order" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;fontStyle=1;" parent="1" vertex="1">
@@ -113,12 +113,12 @@
                 <mxCell id="e4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#333333;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" parent="1" source="decode" target="decodeD" edge="1">
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
-                <mxCell id="e4b" value="yes" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#82b366;fontColor=#4d7a3f;fontSize=10;fontStyle=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" parent="1" source="decodeD" target="process" edge="1">
+                <mxCell id="e4b" value="yes" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#82b366;fontColor=#4d7a3f;fontSize=10;fontStyle=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="decodeD" target="process">
                     <mxGeometry relative="1" as="geometry">
                         <mxPoint x="12" as="offset"/>
                     </mxGeometry>
                 </mxCell>
-                <mxCell id="e16" value="no&#xa;(not valid Avro)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#b85450;fontColor=#b85450;fontSize=10;fontStyle=1;labelBackgroundColor=#f7fbf6;exitX=0;exitY=0.5;entryX=0.15;entryY=0;" parent="1" source="decodeD" target="sendDlq" edge="1">
+                <mxCell id="e16" value="no&#xa;(not valid Avro)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#b85450;fontColor=#b85450;fontSize=10;fontStyle=1;labelBackgroundColor=#f7fbf6;exitX=0;exitY=0.5;entryX=0.15;entryY=0;" edge="1" parent="1" source="decodeD" target="sendDlq">
                     <mxGeometry relative="1" as="geometry">
                         <Array as="points">
                             <mxPoint x="887" y="211"/>
@@ -164,13 +164,13 @@
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
                 <mxCell id="e13" value="next message" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#666666;fontColor=#555555;fontSize=10;exitX=1;exitY=0.5;entryX=0.5;entryY=0;labelBackgroundColor=#f7fbf6;" parent="1" source="nextMsg" target="decode" edge="1">
-                    <mxGeometry relative="1" as="geometry">
+                    <mxGeometry x="0.0547" y="40" relative="1" as="geometry">
                         <Array as="points">
                             <mxPoint x="1350" y="575"/>
                             <mxPoint x="1350" y="88"/>
                             <mxPoint x="1100" y="88"/>
                         </Array>
-                        <mxPoint x="-95" as="offset"/>
+                        <mxPoint as="offset"/>
                     </mxGeometry>
                 </mxCell>
                 <mxCell id="e14" value="message + error headers" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;dashed=1;strokeColor=#b85450;fontColor=#b85450;fontSize=10;labelBackgroundColor=#ffffff;exitX=0;exitY=0.5;entryX=1;entryY=0.5;" parent="1" source="sendDlq" target="dlqTopic" edge="1">

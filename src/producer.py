@@ -80,12 +80,13 @@ def main():
     parser.add_argument("--interval", type=float, default=1.0, help="seconds between sends (default: 1.0)")
     parser.add_argument("--scenario", choices=SCENARIOS, default="normal", help="which failures to simulate (default: normal)")
     parser.add_argument("--poison", action="store_true", help="send one undecodable message and exit")
+    parser.add_argument("--start-id", type=int, default=1001, help="first orderId to use (default: 1001)")
     args = parser.parse_args()
 
     if args.poison:
         send_poison()
     else:
-        send_orders(count=args.count, interval=args.interval, scenario=args.scenario)
+        send_orders(count=args.count, interval=args.interval, scenario=args.scenario, start_id=args.start_id)
 
 
 if __name__ == "__main__":

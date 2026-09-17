@@ -250,27 +250,35 @@ make test              # both
 ## Project structure
 
 ```
-README.md                  this file
-Makefile                   short commands for everything
-requirements.txt           pinned Python dependencies
-pytest.ini                 test configuration
-diagrams/                  high-level architecture diagram (.drawio + .png)
-docker/
-  docker-compose.yml       Kafka broker (KRaft) + topic init + Kafka UI
-  create-topics.sh         creates orders and orders-dlq on startup
-schemas/
-  order.avsc               Avro schema for order messages
-src/
-  config.py                topics, group id, retry settings, schema path
-  avro_codec.py            Avro encode / decode
-  processing.py            running average + retry logic (pure Python)
-  dlq.py                   send to / read from the Dead Letter Queue
-  console.py               colored terminal output
-  producer.py              order producer
-  consumer.py              order consumer
-  dlq_reader.py            prints the DLQ contents
-tests/                     unit tests + one end-to-end test
-docs/                      the original assignment brief (PDF)
+kafka-assessment-2/
+├── README.md                          this file
+├── Makefile                           short commands for everything
+├── requirements.txt                   pinned Python dependencies
+├── pytest.ini                         test configuration
+├── .gitignore                         .venv/, __pycache__/, .pytest_cache/
+├── diagrams/
+│   ├── high-level-architecture.drawio editable diagram source
+│   └── high-level-architecture.png    the diagram shown above
+├── docker/
+│   ├── docker-compose.yml             Kafka broker (KRaft) + topic init + Kafka UI
+│   └── create-topics.sh               creates orders and orders-dlq on startup
+├── schemas/
+│   └── order.avsc                     Avro schema for order messages
+├── src/
+│   ├── config.py                      topics, group id, retry settings, schema path
+│   ├── avro_codec.py                  Avro encode / decode
+│   ├── processing.py                  running average + retry logic (pure Python)
+│   ├── dlq.py                         send to / read from the Dead Letter Queue
+│   ├── console.py                     colored terminal output
+│   ├── producer.py                    order producer
+│   ├── consumer.py                    order consumer
+│   └── dlq_reader.py                  prints the DLQ contents
+├── tests/
+│   ├── test_codec.py                  schema + Avro round-trip
+│   ├── test_processing.py             running average + retry logic
+│   └── test_integration.py            end-to-end test against the broker
+└── docs/
+    └── Assignement Chapter 3.pdf      the original assignment brief
 ```
 
 ## Stopping / starting over

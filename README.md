@@ -255,9 +255,8 @@ kafka-assessment-2/
 ├── Makefile                           short commands for everything
 ├── requirements.txt                   pinned Python dependencies
 ├── pytest.ini                         test configuration
-├── .gitignore                         .venv/, __pycache__/, .pytest_cache/
+├── .gitignore                         .venv/, __pycache__/, .pytest_cache/, *.drawio
 ├── diagrams/
-│   ├── high-level-architecture.drawio editable diagram source
 │   └── high-level-architecture.png    the diagram shown above
 ├── docker/
 │   ├── docker-compose.yml             Kafka broker (KRaft) + topic init + Kafka UI
